@@ -29,12 +29,19 @@ dependency:
 
 ## 操作步骤
 
-### 步骤1：解析PDF文件
-调用 `scripts/read_pdf.py` 读取PDF：
+### 步骤1：读取PDF文件的统计信息
+调用 `scripts/read_pdf.py` ，并使用参数 `--include-content false` 读取 statistics，再判断是否需要分批读取指定范围：
 - 输入：PDF文件路径
+- 参数：`--include-content false`：仅读取统计信息，不包含文本内容
 - 输出：结构化JSON数据
 
-### 步骤2：输出结构化内容
+### 步骤2：解析PDF文件
+调用 `scripts/read_pdf.py` 读取PDF：
+- 输入：PDF文件路径
+- 可选：页范围、是否输出content
+- 输出：结构化JSON数据
+
+### 步骤3：输出结构化内容
 输出包含：
 - content：合并后的纯文本
 - metadata：可用时的PDF元数据
@@ -59,6 +66,22 @@ dependency:
   },
   "error": "错误信息或null"
 }
+```
+
+## 调用命令示例
+先获取统计信息：
+```
+python .trae\skills\pdf-reader\scripts\read_pdf.py D:\docs\whitepaper.pdf --include-content false
+```
+
+文本量较小时，直接读取完整内容：
+```
+python .trae\skills\pdf-reader\scripts\read_pdf.py D:\docs\whitepaper.pdf
+```
+
+文本量较大时，按页范围读取：
+```
+python .trae\skills\pdf-reader\scripts\read_pdf.py D:\docs\whitepaper.pdf --page-start 1 --page-end 5
 ```
 
 ## 资源索引

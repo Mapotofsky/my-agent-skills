@@ -27,12 +27,19 @@ dependency:
 
 ## 操作步骤
 
-### 步骤1：解析doc文件
-调用 `scripts/read_doc.py` 读取doc：
+### 步骤1：读取doc文件的统计信息
+调用 `scripts/read_doc.py` ，并使用参数 `--include-content false` 读取 statistics，再判断是否需要分批读取指定范围：
 - 输入：doc文件路径
+- 参数：`--include-content false`：仅读取统计信息，不包含文本内容
 - 输出：结构化JSON数据
 
-### 步骤2：输出结构化内容
+### 步骤2：解析doc文件
+调用 `scripts/read_doc.py` 读取doc：
+- 输入：doc文件路径
+- 可选：段落范围、表格范围、是否输出content
+- 输出：结构化JSON数据
+
+### 步骤3：输出结构化内容
 输出包含：
 - content：合并后的纯文本内容
 - statistics：基本统计信息
@@ -50,6 +57,25 @@ dependency:
   },
   "error": "错误信息或null"
 }
+```
+
+## 调用命令示例
+先获取统计信息：
+```
+python .trae\skills\doc-reader\scripts\read_doc.py D:\docs\requirements.doc --include-content false
+```
+
+文本量较小时，直接读取完整内容：
+```
+python .trae\skills\doc-reader\scripts\read_doc.py D:\docs\requirements.doc
+```
+
+文本量较大时，按段落或表格范围读取：
+```
+python .trae\skills\doc-reader\scripts\read_doc.py D:\docs\requirements.doc --paragraph-start 1 --paragraph-end 20
+```
+```
+python .trae\skills\doc-reader\scripts\read_doc.py D:\docs\requirements.doc --table-start 2 --table-end 3
 ```
 
 ## 资源索引

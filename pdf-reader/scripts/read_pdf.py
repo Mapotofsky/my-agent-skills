@@ -1,10 +1,40 @@
+import argparse
 import json
 import os
 import sys
+from typing import Optional, Tuple
 from PyPDF2 import PdfReader
 
 
-def extract_pdf(file_path: str) -> dict:
+def parse_bool(value: str) -> bool:
+    value = value.lower()
+    if value in ("true", "1", "yes", "y"):
+        return True
+    if value in ("false", "0", "no", "n"):
+        return False
+    raise ValueError("include-content 仅支持 true/false")
+
+
+def normalize_range(total: int, start: Optional[int], end: Optional[int]) -> Tuple[int, int]:
+    if total <= 0:
+        return 0, 0
+    if start is None:
+        start = 1
+    if end is None:
+        end = total
+    start = max(1, int(start))
+    end = min(total, int(end))
+    if start > end:
+        return 0, 0
+    return start - 1, end
+
+
+def extract_pdf(
+    file_path: str,
+    page_start: Optional[int] = None,
+    page_end: Optional[int] = None,
+    include_content: bool = True
+) -> dict:
     if not os.path.isfile(file_path):
         return {
             "success": False,
@@ -80,7 +110,13 @@ def extract_pdf(file_path: str) -> dict:
         pages.append(page_text)
         char_count += len(page_text)
 
-    content = "\n\n".join([p for p in pages if p]).strip()
+    page_start_index, page_end_index = normalize_range(len(pages), page_start, page_end)
+    selected_pages = pages[page_start_index:page_end_index]
+
+    content = "\n\n".join([p for p in selected_pages if p]).strip()
+    char_count = len(content)
+    if not include_content:
+        content = ""
     metadata = {}
     if reader.metadata:
         metadata = {
@@ -97,7 +133,7 @@ def extract_pdf(file_path: str) -> dict:
         "content": content,
         "metadata": metadata,
         "statistics": {
-            "page_count": len(pages),
+            "page_count": len(selected_pages),
             "char_count": char_count
         },
         "error": None
@@ -105,13 +141,19 @@ def extract_pdf(file_path: str) -> dict:
 
 
 def main():
-    if len(sys.argv) != 2:
-        print("用法: python read_pdf.py <PDF_PATH>")
-        print("示例: python read_pdf.py D:\\docs\\whitepaper.pdf")
-        sys.exit(1)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("file_path")
+    parser.add_argument("--page-start", type=int, default=None)
+    parser.add_argument("--page-end", type=int, default=None)
+    parser.add_argument("--include-content", type=parse_bool, default=True)
 
-    file_path = sys.argv[1]
-    result = extract_pdf(file_path)
+    args = parser.parse_args()
+    result = extract_pdf(
+        args.file_path,
+        page_start=args.page_start,
+        page_end=args.page_end,
+        include_content=args.include_content
+    )
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
     if not result["success"]:
