@@ -3,8 +3,8 @@ import json
 import os
 import sys
 from typing import Optional, Tuple
-from docx import Document
-from docx.opc.exceptions import PackageNotFoundError
+from pptx import Presentation
+from pptx.exc import PackageNotFoundError
 
 
 def parse_bool(value: str) -> bool:
@@ -30,12 +30,10 @@ def normalize_range(total: int, start: Optional[int], end: Optional[int]) -> Tup
     return start - 1, end
 
 
-def extract_docx(
+def extract_pptx(
     file_path: str,
-    paragraph_start: Optional[int] = None,
-    paragraph_end: Optional[int] = None,
-    table_start: Optional[int] = None,
-    table_end: Optional[int] = None,
+    slide_start: Optional[int] = None,
+    slide_end: Optional[int] = None,
     include_content: bool = True,
     output_mode: str = "full"
 ) -> dict:
@@ -44,10 +42,9 @@ def extract_docx(
             "success": False,
             "file_path": file_path,
             "content": "",
-            "paragraphs": [],
-            "tables": [],
+            "slides": [],
             "statistics": {
-                "paragraph_count": 0,
+                "slide_count": 0,
                 "table_count": 0,
                 "table_row_counts": [],
                 "char_count": 0
@@ -55,20 +52,19 @@ def extract_docx(
             "error": "文件不存在"
         }
 
-    if not file_path.lower().endswith(".docx"):
+    if not file_path.lower().endswith(".pptx"):
         return {
             "success": False,
             "file_path": file_path,
             "content": "",
-            "paragraphs": [],
-            "tables": [],
+            "slides": [],
             "statistics": {
-                "paragraph_count": 0,
+                "slide_count": 0,
                 "table_count": 0,
                 "table_row_counts": [],
                 "char_count": 0
             },
-            "error": "仅支持.docx格式"
+            "error": "仅支持.pptx格式"
         }
 
     if output_mode not in ["full", "list"]:
@@ -76,10 +72,9 @@ def extract_docx(
             "success": False,
             "file_path": file_path,
             "content": "",
-            "paragraphs": [],
-            "tables": [],
+            "slides": [],
             "statistics": {
-                "paragraph_count": 0,
+                "slide_count": 0,
                 "table_count": 0,
                 "table_row_counts": [],
                 "char_count": 0
@@ -88,31 +83,29 @@ def extract_docx(
         }
 
     try:
-        document = Document(file_path)
+        presentation = Presentation(file_path)
     except PackageNotFoundError:
         return {
             "success": False,
             "file_path": file_path,
             "content": "",
-            "paragraphs": [],
-            "tables": [],
+            "slides": [],
             "statistics": {
-                "paragraph_count": 0,
+                "slide_count": 0,
                 "table_count": 0,
                 "table_row_counts": [],
                 "char_count": 0
             },
-            "error": "无法读取docx文件"
+            "error": "无法读取pptx文件"
         }
     except Exception as exc:
         return {
             "success": False,
             "file_path": file_path,
             "content": "",
-            "paragraphs": [],
-            "tables": [],
+            "slides": [],
             "statistics": {
-                "paragraph_count": 0,
+                "slide_count": 0,
                 "table_count": 0,
                 "table_row_counts": [],
                 "char_count": 0
@@ -120,39 +113,58 @@ def extract_docx(
             "error": str(exc)
         }
 
-    paragraphs = [p.text.strip() for p in document.paragraphs if p.text and p.text.strip()]
-    tables = []
+    slides = list(presentation.slides)
+    slide_start_index, slide_end_index = normalize_range(len(slides), slide_start, slide_end)
+    selected_slides = slides[slide_start_index:slide_end_index]
+
+    content_blocks = []
     table_row_counts = []
+    table_count = 0
+    slides_list = []
 
-    for table in document.tables:
-        table_rows = []
-        for row in table.rows:
-            row_cells = [cell.text.strip() for cell in row.cells]
-            table_rows.append(row_cells)
-        tables.append(table_rows)
-        table_row_counts.append(len(table_rows))
+    for index, slide in enumerate(selected_slides, start=slide_start_index + 1):
+        slide_parts = []
+        slide_texts = []
+        slide_tables = []
+        notes_text = ""
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                text = (shape.text or "").strip()
+                if text:
+                    slide_parts.append(text)
+                    slide_texts.append(text)
+            if shape.has_table:
+                table = shape.table
+                rows = []
+                for row in table.rows:
+                    row_cells = [cell.text.strip() for cell in row.cells]
+                    rows.append(row_cells)
+                table_count += 1
+                table_row_counts.append(len(rows))
+                table_text = "\n".join(["\t".join(cells) for cells in rows]).strip()
+                if table_text:
+                    slide_parts.append(table_text)
+                    slide_tables.append(table_text)
+        if slide.has_notes_slide:
+            notes_frame = slide.notes_slide.notes_text_frame
+            if notes_frame:
+                notes_text = (notes_frame.text or "").strip()
+        if notes_text:
+            slide_parts.append(" notes: " + notes_text)
+            slide_texts.append(" notes: " + notes_text)
+        if slide_parts:
+            content_blocks.append("\n".join(slide_parts))
+        if slide_texts:
+            slide_texts = "\n".join(slide_texts).strip()
+        else:
+            slide_texts = ""
+        slides_list.append({
+            "slide_index": index,
+            "texts": slide_texts,
+            "tables": slide_tables
+        })
 
-    paragraph_start_index, paragraph_end_index = normalize_range(
-        len(paragraphs), paragraph_start, paragraph_end
-    )
-    table_start_index, table_end_index = normalize_range(len(tables), table_start, table_end)
-
-    selected_paragraphs = paragraphs[paragraph_start_index:paragraph_end_index]
-    selected_tables = tables[table_start_index:table_end_index]
-    selected_table_row_counts = table_row_counts[table_start_index:table_end_index]
-
-    table_text_blocks = []
-    for table in selected_tables:
-        rows = ["\t".join(cells) for cells in table]
-        table_text_blocks.append("\n".join(rows))
-
-    content_parts = []
-    if selected_paragraphs:
-        content_parts.append("\n".join(selected_paragraphs))
-    if table_text_blocks:
-        content_parts.append("\n\n".join(table_text_blocks))
-
-    content = "\n\n".join(content_parts).strip()
+    content = "\n\n".join(content_blocks).strip()
     char_count = len(content)
     if output_mode != "full" or not include_content:
         content = ""
@@ -161,12 +173,11 @@ def extract_docx(
         "success": True,
         "file_path": file_path,
         "content": content if output_mode == "full" else "",
-        "paragraphs": selected_paragraphs if output_mode == "list" else [],
-        "tables": table_text_blocks if output_mode == "list" else [],
+        "slides": slides_list if output_mode == "list" else [],
         "statistics": {
-            "paragraph_count": len(selected_paragraphs),
-            "table_count": len(selected_tables),
-            "table_row_counts": selected_table_row_counts,
+            "slide_count": len(selected_slides),
+            "table_count": table_count,
+            "table_row_counts": table_row_counts,
             "char_count": char_count
         },
         "error": None
@@ -176,20 +187,16 @@ def extract_docx(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("file_path")
-    parser.add_argument("--paragraph-start", type=int, default=None)
-    parser.add_argument("--paragraph-end", type=int, default=None)
-    parser.add_argument("--table-start", type=int, default=None)
-    parser.add_argument("--table-end", type=int, default=None)
+    parser.add_argument("--slide-start", type=int, default=None)
+    parser.add_argument("--slide-end", type=int, default=None)
     parser.add_argument("--include-content", type=parse_bool, default=True)
     parser.add_argument("--output-mode", choices=["full", "list"], default="full")
 
     args = parser.parse_args()
-    result = extract_docx(
+    result = extract_pptx(
         args.file_path,
-        paragraph_start=args.paragraph_start,
-        paragraph_end=args.paragraph_end,
-        table_start=args.table_start,
-        table_end=args.table_end,
+        slide_start=args.slide_start,
+        slide_end=args.slide_end,
         include_content=args.include_content,
         output_mode=args.output_mode
     )

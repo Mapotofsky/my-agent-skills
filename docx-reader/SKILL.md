@@ -1,6 +1,6 @@
 ---
 name: "docx-reader"
-description: "Reads .docx Word files and extracts text content. Invoke when user asks to read, parse, or summarize .docx documents."
+description: "Reads .docx Word files and extracts full content or paragraph/table lists. Invoke when user asks to read, parse, or summarize .docx documents."
 dependency:
   python:
     - python-docx>=1.1.0
@@ -14,6 +14,7 @@ dependency:
   - 解析段落文本
   - 解析表格内容
   - 输出结构化JSON数据，便于后续摘要或分析
+  - 支持输出完整内容或段落表格列表
 - 触发条件：
   - 用户提供.docx文件路径
   - 用户要求读取、解析或提取Word内容
@@ -36,12 +37,14 @@ dependency:
 ### 步骤2：解析docx文件
 调用 `scripts/read_docx.py` 读取docx：
 - 输入：docx文件路径
-- 可选：段落范围、表格范围、是否输出content
+- 可选：段落范围、表格范围、是否输出content、输出模式
 - 输出：结构化JSON数据
 
 ### 步骤3：输出结构化内容
 输出包含：
-- content：合并后的纯文本内容
+- content：合并后的纯文本内容（output-mode 为 full 时）
+- paragraphs：段落列表（output-mode 为 list 时）
+- tables：表格列表（output-mode 为 list 时）
 - statistics：基本统计信息
 
 ## 输出格式
@@ -50,6 +53,8 @@ dependency:
   "success": true/false,
   "file_path": "输入路径",
   "content": "合并后的纯文本",
+  "paragraphs": ["段落1", "段落2"],
+  "tables": ["表格A", "表格B"],
   "statistics": {
     "paragraph_count": 0,
     "table_count": 0,
@@ -76,6 +81,11 @@ python .trae\skills\docx-reader\scripts\read_docx.py D:\docs\requirements.docx -
 ```
 ```
 python .trae\skills\docx-reader\scripts\read_docx.py D:\docs\requirements.docx --table-start 2 --table-end 3
+```
+
+需要段落与表格列表：
+```
+python .trae\skills\docx-reader\scripts\read_docx.py D:\docs\requirements.docx --output-mode list
 ```
 
 ## 资源索引

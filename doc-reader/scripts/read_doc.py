@@ -35,13 +35,16 @@ def extract_doc(
     paragraph_end: Optional[int] = None,
     table_start: Optional[int] = None,
     table_end: Optional[int] = None,
-    include_content: bool = True
+    include_content: bool = True,
+    output_mode: str = "full"
 ) -> dict:
     if not os.path.isfile(file_path):
         return {
             "success": False,
             "file_path": file_path,
             "content": "",
+            "paragraphs": [],
+            "tables": [],
             "statistics": {
                 "paragraph_count": 0,
                 "table_count": 0,
@@ -56,6 +59,8 @@ def extract_doc(
             "success": False,
             "file_path": file_path,
             "content": "",
+            "paragraphs": [],
+            "tables": [],
             "statistics": {
                 "paragraph_count": 0,
                 "table_count": 0,
@@ -63,6 +68,22 @@ def extract_doc(
                 "char_count": 0
             },
             "error": "仅支持.doc格式"
+        }
+
+    if output_mode not in ["full", "list"]:
+        return {
+            "success": False,
+            "file_path": file_path,
+            "content": "",
+            "paragraphs": [],
+            "tables": [],
+            "statistics": {
+                "paragraph_count": 0,
+                "table_count": 0,
+                "table_row_counts": [],
+                "char_count": 0
+            },
+            "error": 'output_mode 仅限 ["full", "list"]'
         }
 
     try:
@@ -74,6 +95,8 @@ def extract_doc(
             "success": False,
             "file_path": file_path,
             "content": "",
+            "paragraphs": [],
+            "tables": [],
             "statistics": {
                 "paragraph_count": 0,
                 "table_count": 0,
@@ -131,13 +154,15 @@ def extract_doc(
 
     content = "\n\n".join(content_parts).strip()
     char_count = len(content)
-    if not include_content:
+    if output_mode != "full" or not include_content:
         content = ""
 
     return {
         "success": True,
         "file_path": file_path,
-        "content": content,
+        "content": content if output_mode == "full" else "",
+        "paragraphs": selected_paragraphs if output_mode == "list" else [],
+        "tables": selected_tables if output_mode == "list" else [],
         "statistics": {
             "paragraph_count": len(selected_paragraphs),
             "table_count": len(selected_tables),
@@ -156,6 +181,7 @@ def main():
     parser.add_argument("--table-start", type=int, default=None)
     parser.add_argument("--table-end", type=int, default=None)
     parser.add_argument("--include-content", type=parse_bool, default=True)
+    parser.add_argument("--output-mode", choices=["full", "list"], default="full")
 
     args = parser.parse_args()
     result = extract_doc(
@@ -164,7 +190,8 @@ def main():
         paragraph_end=args.paragraph_end,
         table_start=args.table_start,
         table_end=args.table_end,
-        include_content=args.include_content
+        include_content=args.include_content,
+        output_mode=args.output_mode
     )
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
